@@ -204,7 +204,7 @@ function cb (err, data, index, max) {
   return start(index + 1, max)
 }
 ```
-Utilizando promises ao inves de callbacks 
+Utilizando promises ao inves de callbacks . todo catch e then nao é uma promise propriamente dita mas retorna uma promise 
 ```Javascript
 const promise = new Promise((resolve, reject) => {
   setTimeout(() => resolve('End'), 5000)
@@ -228,49 +228,208 @@ promise.then((res)=> {),(rej)=>{})
 promise.then((res)=> {)) 
 promise.catch((rej)=>{}) 
 ```
-
+A maioria das libs externas nao funciona com promisify 
 
 ```Javascript
+  
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const basePath = './assets/'
 
+const readFileAsync = promisify(fs.readFile)
+
+// Will render Begin and End first
+console.log('Begin')
+readFileAsync(path.resolve(basePath, 'invictus.txt'), { encoding: 'utf-8' })
+  .then((data) => console.log(data))
+  .catch((err) => console.error(err))
+console.log('End')
+```
+Encadeamento de promises 
+podemos encadear thens e catches 
+
+```Javascript
+const coinFlip = new Promise((resolve, reject) => Math.random() > 0.5 ? resolve(true) : reject(false))
+/// 50% de chance de dar erro 
+console.log('Begin')
+
+// First case, if we have an error the last 'then' won't execute
+coinFlip.then((data) => console.log('Yay 1'))
+  .then(() => console.log('End1'))
+  .catch((err) => console.error('Error in first case, then will not execute'))
+
+// Second case, in an exception the last then will execute
+coinFlip.then((data) => console.log('Yay 2'))
+coinFlip.catch((err) => console.error('Next then will execute'))
+coinFlip.then(() => console.log('End2'))
+
+// Same thing
+coinFlip
+  .then((success) => console.log('Yay 3'), (fail) => console.log('Error in third case'))
+  .then(() => console.log('End3'))
+```
+Cada catch só vale pra um then; quando ocorre um erro no then ele percorre todos os outros até encontrar o primeiro catch 
+```Javascript
+
+// Second case, in an exception the last then will execute
+coinFlip.then((data) => console.log('Yay 2'))
+coinFlip.catch((err) => console.error('Next then will execute'))
+coinFlip.then(() => console.log('End2'))
+
+// Same thing
+coinFlip
+  .then((success) => console.log('Yay 3'), (fail) => console.log('Error in third case'))
+  .then(() => console.log('End3'))
+```
+
+then = garçom (pode ter dois ) e catch seria outro pedido. A execução não para 
+```Javascript
+const coinFlip = new Promise((resolve, reject) => Math.random() > 0.5 ? resolve(true) : reject(false))
+
+console.log('Begin')
+
+coinFlip.then((data) => console.log(data))
+  .catch((err) => { throw err })
+  .then(() => console.log('End1'))
+
+new Promise((resolve) => setTimeout(() => resolve(), 2000)).then(() => console.log('Yay'))
+```
+Multiple catches 
+```Javascript
+const coinFlip = new Promise((resolve, reject) => Math.random() > 0.5 ? resolve(true) : reject(false))
+
+console.log('Begin')
+
+// First catch will capture error from first then, last catch will capture errors from next then
+coinFlip.then((data) => console.log('Yay 1'))
+  .catch(() => console.log('First catch'))
+  .then(() => console.log('Result'))
+  .catch((err) => console.error('Error in last then'))
+  .then(() => console.log('End1'))
+
+
+// // Both catches will be executed
+coinFlip.then((data) => console.log('Yay 1'))
+  .then(() => console.log('Result'))
+  .then(() => console.log('End1'))
+
+coinFlip.catch(() => console.log('First catch'))
+  .catch((err) => console.error('Error in first case, next then will not execute'))
+
+
+// Both catches will be executed
+coinFlip.then((data) => console.log('Yay 1'))
+  .catch((err) => console.error('Catch after then'))
+  .then(() => console.log('Result'))
+  .then(() => console.log('End1'))
+
+coinFlip.catch(() => console.log('First catch'))
+
+// Catch from coinFlip will execute only when the first then fails, second catch will always be executed
+coinFlip.then((data) => console.log('Yay 1'))
+  .then(() => { throw new Error() })
+  .catch((err) => console.error('Error in last then'))
+  .then(() => console.log('End1'))
+
+coinFlip.catch(() => console.log('First catch'))
 ```
 
 
 ```Javascript
+const coinFlip = new Promise((resolve, reject) => setTimeout(() => Math.random() > 0.5 ? resolve(true) : reject(false), 2000))
+let p = Promise.resolve('Yay').then(coinFlip) /// coinflip nao eh funcao eh uma promise 
+/// Promise.resolve retorna uma promise 
 
+// P will resolve immediately to YAY, but will not be settled until the second promise resolves with the coinflip
+p.then(console.log).catch(() => console.log('error')) /// resolve a primeira depois espera 2 s e resolve a segunda 
 ```
+Finally Será sempre executando dando erro ou nao 
+```Javascript
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const basePath = './assets/'
+
+const readFileAsync = promisify(fs.readFile)
+
+console.log('Begin')
+readFileAsync(path.resolve(basePath, 'invictus.txt'), { encoding: 'utf-8' })
+  .then((data) => console.log(data))
+  .catch((err) => console.error(err))
+  .finally(() => console.log('End'))
+```
+Promise hell , encadeamento de promises 
 
 ```Javascript
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const basePath = './assets/'
 
+const readFileAsync = promisify(fs.readFile)
+
+console.log('Begin')
+readFileAsync(path.resolve(basePath, 's1.txt'), { encoding: 'utf-8' })
+  .then((sentence) => {
+    console.log(sentence, '\n')
+    return readFileAsync(path.resolve(basePath, 's2.txt'), { encoding: 'utf-8' })
+  })
+  .then((sentence) => {
+    console.log(sentence, '\n')
+    return readFileAsync(path.resolve(basePath, 's3.txt'), { encoding: 'utf-8' })
+  })
+  .then((sentence) => {
+    console.log(sentence, '\n')
+    return readFileAsync(path.resolve(basePath, 's4.txt'), { encoding: 'utf-8' })
+  })
+  .then(console.log)
+  .finally(() => console.log('End'))
 ```
 
+Melhorando o promise hell 
+```Javascript
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const basePath = './assets/'
+
+const readFileAsync = promisify(fs.readFile)
+
+function read (index) {
+  return readFileAsync(path.resolve(basePath, `s${index}.txt`), { encoding: 'utf-8' })
+}
+
+function start (index, max) {
+  if (index > max) return
+  read(index).then((data) => {
+    console.log(data, '\n')
+    start(index + 1, max)
+  })
+}
+
+start(1, 4)
+```
+
+Promise.all resolve todas as promises 
+Se qquer uma falhar vai dar erro em todas e retornara apenas o 1º catch 
 
 ```Javascript
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const basePath = './assets/'
 
+const readFileAsync = promisify(fs.readFile)
+
+function read (index) {
+  return readFileAsync(path.resolve(basePath, `s${index}.txt`), { encoding: 'utf-8' })
+}
+
+console.log('Begin')
+const promiseArray = []
+for (let i = 1; i <= 4; i++) promiseArray[i - 1] = read(i) // Arrays start at 0, so if we are populating index 1, the 0 will be undefined
+
+Promise.all(promiseArray).then(console.log)
 ```
 
-```Javascript
-
-```
-
-
-```Javascript
-
-```
-
-```Javascript
-
-```
-
-
-```Javascript
-
-```
-
-```Javascript
-
-```
-
-
-```Javascript
-
-```
