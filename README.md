@@ -1,2 +1,0 @@
-# EntendendoPromisesdeumavezportodas
-EntendendoPromisesdeumavezportodas
